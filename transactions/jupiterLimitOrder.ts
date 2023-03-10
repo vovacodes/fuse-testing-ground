@@ -4,10 +4,14 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SystemProgram,
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { getFuseWallet } from "../fuse-wallet";
+import {
+  hasGetEphemeralSignersFeature,
+  FuseGetEphemeralSignersFeatureIdentifier,
+} from "@sqds/fuse-wallet";
 
 export async function createJupiterLimitOrder(
   connection: Connection,
@@ -21,15 +25,25 @@ export async function createJupiterLimitOrder(
     throw new Error("Not connected");
 
   const walletPubkey = walletContext.wallet.adapter.publicKey!;
+  const walletAdapter = walletContext.wallet.adapter;
 
-  const fuseWallet = getFuseWallet(walletContext);
-  const baseAccount = (await fuseWallet?.getEphemeralWalletAccounts(1))?.at(0);
+  const baseEphemeralAddress =
+    "standard" in walletAdapter &&
+    hasGetEphemeralSignersFeature(walletAdapter.wallet) &&
+    (
+      await walletAdapter.wallet.features[
+        FuseGetEphemeralSignersFeatureIdentifier
+      ].getEphemeralSigners(1)
+    )[0];
+
+  const baseEphemeralPubkey = baseEphemeralAddress
+    ? new PublicKey(baseEphemeralAddress)
+    : null;
+  console.log("Ephemeral Base Address", baseEphemeralAddress);
 
   const baseKeypair = Keypair.generate();
 
-  const basePubkey = baseAccount
-    ? new PublicKey(baseAccount.publicKey)
-    : baseKeypair.publicKey;
+  const basePubkey = baseEphemeralPubkey ?? baseKeypair.publicKey;
 
   console.log("Base:", basePubkey.toBase58());
 
@@ -38,7 +52,7 @@ export async function createJupiterLimitOrder(
   const { tx, orderPubKey } = await limitOrder.createOrder({
     owner: walletPubkey,
     inAmount: new BN(0.001 * LAMPORTS_PER_SOL),
-    outAmount: new BN(0.025 * 1_000_000), // 1_000_000 => 1 USDC if inputToken.address is USDC mint
+    outAmount: new BN(0.03 * 1_000_000), // 1_000_000 => 1 USDC if inputToken.address is USDC mint
     inputMint: new PublicKey("So11111111111111111111111111111111111111112"), // WSOL
     outputMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC
     expiredAt: null, // new BN(new Date().valueOf() / 1000),
@@ -50,13 +64,8 @@ export async function createJupiterLimitOrder(
 
   console.log("Creating new Limit Order on Jupiter:", orderPubKey.toBase58());
 
-  let signedTx;
-  if (fuseWallet && baseAccount) {
-    signedTx = await fuseWallet.signTransaction(tx, {
-      ephemeralSigners: [baseAccount],
-    });
-  } else {
-    signedTx = await walletContext.signTransaction(tx);
+  const signedTx = await walletContext.signTransaction(tx);
+  if (!baseEphemeralPubkey) {
     signedTx.partialSign(baseKeypair);
   }
 

@@ -1,6 +1,5 @@
 import "../styles/globals.css";
 import type { AppProps } from "next/app";
-import { clusterApiUrl } from "@solana/web3.js";
 import {
   ConnectionProvider,
   WalletProvider,

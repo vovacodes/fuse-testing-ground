@@ -1,9 +1,11 @@
 import Head from "next/head";
 import { Inter } from "@next/font/google";
 import styles from "../styles/Home.module.css";
-import { createJupiterLimitOrder } from "../transactions/jupiterLimitOrder";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { createJupiterLimitOrder } from "../transactions/jupiterLimitOrder";
+import { initializeMint } from "../transactions/initializeMint";
+import { sendMemo } from "../transactions/sendMemo";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,6 +33,16 @@ export default function Home() {
                 }
               >
                 Jupiter New Limit Order
+              </button>
+            </div>
+            <div className={styles.transaction}>
+              <button onClick={() => initializeMint(connection, walletContext)}>
+                Initialize Mint
+              </button>
+            </div>
+            <div className={styles.transaction}>
+              <button onClick={() => sendMemo(connection, walletContext)}>
+                Send Memo
               </button>
             </div>
           </>
